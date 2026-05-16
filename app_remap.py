@@ -431,6 +431,47 @@ class RemapApp:
         )
         self.listbox_dirs.pack(fill="x")
 
+        # Giữ cụm thao tác ở đáy tab trước, để vùng mapping chỉ ăn phần chiều cao còn lại.
+        # Nếu pack vùng mapping expand trước, nó có thể nở quá mức và đẩy nút Run ra khỏi màn hình.
+        frame_bottom = tk.Frame(self.tab_remap, bg=COLOR_BG)
+        frame_bottom.pack(side="bottom", fill="x", padx=20, pady=(10, 20))
+
+        chk_force = tk.Checkbutton(
+            frame_bottom,
+            text="Map lại folder đã có dấu .da_remap_xong",
+            variable=self.force_remap_var,
+            font=("Segoe UI", 10),
+            bg=COLOR_BG,
+            fg=COLOR_TEXT_MAIN,
+            activebackground=COLOR_BG,
+            cursor="hand2",
+        )
+        chk_force.pack(anchor="w", pady=(0, 8))
+
+        self.btn_run = self.make_button(
+            frame_bottom,
+            "BẮT ĐẦU CHUẨN HOÁ",
+            self.run_remap_thread,
+            "success",
+            state=tk.DISABLED,
+            font=("Segoe UI", 12, "bold"),
+            height=48,
+        )
+        self.btn_run.pack(fill="x", pady=(0, 10))
+
+        self.txt_log = tk.Text(
+            frame_bottom,
+            height=8,
+            font=("Consolas", 10),
+            bg=COLOR_LOG_BG,
+            fg=COLOR_LOG_FG,
+            relief="flat",
+            padx=12,
+            pady=12,
+        )
+        self.txt_log.pack(fill="x")
+        self.log("Sẵn sàng. Hãy bấm 'Thêm folder dataset' để bắt đầu.")
+
         frame_map_container = self.make_panel(self.tab_remap, "2. Ghép nối class")
         frame_map_container.pack(fill="both", expand=True, padx=20, pady=(0, 12))
         
@@ -486,46 +527,6 @@ class RemapApp:
         )
         self.btn_add_row.pack(anchor="w", pady=(10, 0))
 
-        # --- SECTION 3: Action & Log ---
-        frame_bottom = tk.Frame(self.tab_remap, bg=COLOR_BG)
-        frame_bottom.pack(fill="x", padx=20, pady=(10, 20))
-
-        chk_force = tk.Checkbutton(
-            frame_bottom,
-            text="Map lại folder đã có dấu .da_remap_xong",
-            variable=self.force_remap_var,
-            font=("Segoe UI", 10),
-            bg=COLOR_BG,
-            fg=COLOR_TEXT_MAIN,
-            activebackground=COLOR_BG,
-            cursor="hand2",
-        )
-        chk_force.pack(anchor="w", pady=(0, 8))
-
-        self.btn_run = self.make_button(
-            frame_bottom,
-            "BẮT ĐẦU CHUẨN HOÁ",
-            self.run_remap_thread,
-            "success",
-            state=tk.DISABLED,
-            font=("Segoe UI", 12, "bold"),
-            height=48,
-        )
-        self.btn_run.pack(fill="x", pady=(0, 10))
-
-        self.txt_log = tk.Text(
-            frame_bottom,
-            height=8,
-            font=("Consolas", 10),
-            bg=COLOR_LOG_BG,
-            fg=COLOR_LOG_FG,
-            relief="flat",
-            padx=12,
-            pady=12,
-        )
-        self.txt_log.pack(fill="x")
-        self.log("Sẵn sàng. Hãy bấm 'Thêm folder dataset' để bắt đầu.")
-        
         self.build_mapping_ui()
 
     def build_rename_tab(self):
