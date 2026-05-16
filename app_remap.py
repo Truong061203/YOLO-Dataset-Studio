@@ -1,5 +1,6 @@
 import os
 import glob
+import random
 import re
 import shutil
 import yaml
@@ -180,6 +181,15 @@ class RemapApp:
         self.merge_output_var = tk.StringVar(value=r"D:\CSDL_Global\Master_Dataset")
         self.merge_rebuild_var = tk.BooleanVar(value=True)
         self.merge_status_var = tk.StringVar(value="Chưa cấu hình dataset cần gộp")
+        self.split_source_var = tk.StringVar()
+        self.split_output_var = tk.StringVar()
+        self.split_classes_file_var = tk.StringVar()
+        self.split_classes = []
+        self.split_train_ratio_var = tk.StringVar(value="0.8")
+        self.split_val_ratio_var = tk.StringVar(value="0.1")
+        self.split_test_ratio_var = tk.StringVar(value="0.1")
+        self.split_rebuild_var = tk.BooleanVar(value=True)
+        self.split_status_var = tk.StringVar(value="Chưa chọn folder nguồn")
         self.activity_text_var = tk.StringVar(value="Sẵn sàng xử lý")
         self.activity_after_id = None
         self.activity_frames = ["◐", "◓", "◑", "◒"]
@@ -274,15 +284,18 @@ class RemapApp:
         self.tab_rename = tk.Frame(self.notebook, bg=COLOR_BG)
         self.tab_clean = tk.Frame(self.notebook, bg=COLOR_BG)
         self.tab_merge = tk.Frame(self.notebook, bg=COLOR_BG)
+        self.tab_split = tk.Frame(self.notebook, bg=COLOR_BG)
         self.notebook.add(self.tab_remap, text="Chuẩn hoá ID")
         self.notebook.add(self.tab_rename, text="Đổi tên dataset")
         self.notebook.add(self.tab_clean, text="Dọn dữ liệu")
         self.notebook.add(self.tab_merge, text="Gộp dataset")
+        self.notebook.add(self.tab_split, text="Chia dataset")
 
         self.build_remap_tab()
         self.build_rename_tab()
         self.build_clean_tab()
         self.build_merge_tab()
+        self.build_split_tab()
         self.build_activity_bar()
 
     def make_panel(self, parent, title):
@@ -690,6 +703,235 @@ class RemapApp:
         self.make_button(actions, "Xóa dòng đã chọn", self.remove_merge_job, "danger").pack(side="left")
         self.make_button(actions, "Gộp dataset", self.run_merge_thread, "success").pack(side="right")
         tk.Label(actions, textvariable=self.merge_status_var, bg=COLOR_BG, fg=COLOR_TEXT_MAIN, font=("Segoe UI", 10, "bold")).pack(side="left", padx=12)
+
+    def build_split_tab(self):
+        self.make_section_intro(
+            self.tab_split,
+            "Chia dataset phẳng thành train / val / test",
+            "Dành cho folder nguồn đang chứa ảnh và label lẫn chung; app sẽ copy cặp hợp lệ và tạo data.yaml.",
+        )
+
+        config = self.make_panel(self.tab_split, "Cấu hình chia dataset")
+        config.pack(fill="x", padx=20, pady=(0, 12))
+
+        tk.Label(config, text="Folder nguồn", bg=COLOR_PANEL, fg=COLOR_TEXT_MUTED).grid(row=0, column=0, sticky="w")
+        self.make_entry(config, self.split_source_var, mono=True).grid(row=1, column=0, sticky="ew", padx=(0, 8), ipady=7)
+        self.make_button(config, "Chọn nguồn", self.select_split_source, "primary").grid(row=1, column=1)
+
+        tk.Label(config, text="Folder output", bg=COLOR_PANEL, fg=COLOR_TEXT_MUTED).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        self.make_entry(config, self.split_output_var, mono=True).grid(row=3, column=0, sticky="ew", padx=(0, 8), ipady=7)
+        self.make_button(config, "Chọn output", self.select_split_output, "muted").grid(row=3, column=1)
+
+        tk.Label(config, text="File class .txt (không bắt buộc)", bg=COLOR_PANEL, fg=COLOR_TEXT_MUTED).grid(row=4, column=0, sticky="w", pady=(10, 0))
+        self.make_entry(config, self.split_classes_file_var, mono=True).grid(row=5, column=0, sticky="ew", padx=(0, 8), ipady=7)
+        self.make_button(config, "Nhập file class", self.select_split_classes_file, "accent").grid(row=5, column=1)
+
+        ratio_row = tk.Frame(config, bg=COLOR_PANEL)
+        ratio_row.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        for idx, (label, var) in enumerate(
+            [
+                ("Train", self.split_train_ratio_var),
+                ("Val", self.split_val_ratio_var),
+                ("Test", self.split_test_ratio_var),
+            ]
+        ):
+            tk.Label(ratio_row, text=label, bg=COLOR_PANEL, fg=COLOR_TEXT_MUTED).grid(row=0, column=idx, sticky="w", padx=(0, 8))
+            self.make_entry(ratio_row, var).grid(row=1, column=idx, sticky="ew", padx=(0, 10), ipady=7)
+            ratio_row.grid_columnconfigure(idx, weight=1)
+
+        tk.Checkbutton(
+            config,
+            text="Tạo lại folder output từ đầu",
+            variable=self.split_rebuild_var,
+            bg=COLOR_PANEL,
+            fg=COLOR_TEXT_MAIN,
+            activebackground=COLOR_PANEL,
+        ).grid(row=7, column=0, sticky="w", pady=(12, 0))
+        config.grid_columnconfigure(0, weight=1)
+
+        actions = tk.Frame(self.tab_split, bg=COLOR_BG)
+        actions.pack(fill="x", padx=20, pady=(0, 12))
+        self.make_button(actions, "Quét trước", self.preview_split_dataset, "accent").pack(side="left")
+        self.make_button(actions, "Chia dataset", self.run_split_thread, "success").pack(side="right")
+        tk.Label(actions, textvariable=self.split_status_var, bg=COLOR_BG, fg=COLOR_TEXT_MAIN, font=("Segoe UI", 10, "bold")).pack(side="left", padx=12)
+
+        preview = self.make_panel(self.tab_split, "Preview")
+        preview.pack(fill="both", expand=True, padx=20, pady=(0, 12))
+        self.split_log = tk.Text(
+            preview,
+            height=12,
+            font=("Consolas", 10),
+            bg=COLOR_LOG_BG,
+            fg=COLOR_LOG_FG,
+            relief="flat",
+            padx=12,
+            pady=12,
+        )
+        self.split_log.pack(fill="both", expand=True)
+
+    def select_split_source(self):
+        dir_path = filedialog.askdirectory(title="Chọn folder nguồn chứa ảnh và label")
+        if dir_path:
+            self.split_source_var.set(dir_path)
+            self.split_status_var.set("Đã chọn folder nguồn")
+
+    def select_split_output(self):
+        dir_path = filedialog.askdirectory(title="Chọn folder output")
+        if dir_path:
+            self.split_output_var.set(dir_path)
+
+    def select_split_classes_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Chọn file class (.txt)",
+            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+        )
+        if not file_path:
+            return
+        try:
+            self.split_classes = self.read_classes_file(file_path)
+        except Exception as e:
+            messagebox.showerror("Lỗi file class", str(e))
+            return
+        self.split_classes_file_var.set(file_path)
+        self.split_status_var.set(f"Đã nhập {len(self.split_classes)} class từ file .txt")
+
+    def read_classes_file(self, file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            classes = [line.strip() for line in f if line.strip()]
+        if not classes:
+            raise ValueError("File class không có nội dung hợp lệ.")
+        return classes
+
+    def get_split_classes(self):
+        return self.split_classes if self.split_classes else self.master_classes
+
+    def append_split_log(self, message):
+        self.split_log.insert(tk.END, message + "\n")
+        self.split_log.see(tk.END)
+        self.root.update()
+
+    def parse_split_ratios(self):
+        train_ratio = float(self.split_train_ratio_var.get().strip())
+        val_ratio = float(self.split_val_ratio_var.get().strip())
+        test_ratio = float(self.split_test_ratio_var.get().strip())
+        ratios = [train_ratio, val_ratio, test_ratio]
+        if any(ratio < 0 for ratio in ratios):
+            raise ValueError("Tỉ lệ chia không được âm.")
+        if abs(sum(ratios) - 1.0) > 0.0001:
+            raise ValueError("Tổng tỉ lệ Train + Val + Test phải bằng 1.0.")
+        return train_ratio, val_ratio, test_ratio
+
+    def collect_flat_pairs(self, source_dir):
+        pairs = []
+        missing_labels = []
+        for ext in IMAGE_EXTENSIONS:
+            for image_path in sorted(glob.glob(os.path.join(source_dir, f"*{ext}"))):
+                base_name = os.path.splitext(os.path.basename(image_path))[0]
+                label_path = os.path.join(source_dir, base_name + ".txt")
+                if os.path.exists(label_path):
+                    pairs.append((image_path, label_path))
+                else:
+                    missing_labels.append(image_path)
+        return pairs, missing_labels
+
+    def preview_split_dataset(self):
+        source_dir = self.split_source_var.get().strip()
+        self.split_log.delete("1.0", tk.END)
+        if not source_dir or not os.path.exists(source_dir):
+            messagebox.showerror("Thiếu folder", "Hãy chọn folder nguồn hợp lệ.")
+            return
+        try:
+            train_ratio, val_ratio, test_ratio = self.parse_split_ratios()
+        except ValueError as e:
+            messagebox.showerror("Sai tỉ lệ", str(e))
+            return
+
+        pairs, missing_labels = self.collect_flat_pairs(source_dir)
+        total = len(pairs)
+        train_count = int(total * train_ratio)
+        val_count = int(total * val_ratio)
+        test_count = total - train_count - val_count
+        classes = self.get_split_classes()
+        class_source = "file class đã nhập" if self.split_classes else "master classes"
+        self.append_split_log(f"Cặp hợp lệ: {total}")
+        self.append_split_log(f"Ảnh thiếu label: {len(missing_labels)}")
+        self.append_split_log(f"Class dùng để tạo YAML: {len(classes)} ({class_source})")
+        self.append_split_log(f"Dự kiến train: {train_count}")
+        self.append_split_log(f"Dự kiến val: {val_count}")
+        self.append_split_log(f"Dự kiến test: {test_count}")
+        self.split_status_var.set(f"Sẵn sàng chia {total} cặp ảnh-label")
+
+    def write_split_yaml(self, output_dir):
+        yaml_path = os.path.join(output_dir, "data.yaml")
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            f.write(f"path: {output_dir.replace('\\', '/') }\n")
+            f.write("train: train/images\n")
+            f.write("val: valid/images\n")
+            f.write("test: test/images\n\n")
+            classes = self.get_split_classes()
+            f.write(f"nc: {len(classes)}\n")
+            f.write("names:\n")
+            for idx, class_name in enumerate(classes):
+                f.write(f"  {idx}: {class_name}\n")
+
+    def run_split_thread(self):
+        source_dir = self.split_source_var.get().strip()
+        output_dir = self.split_output_var.get().strip()
+        if not source_dir or not os.path.exists(source_dir):
+            messagebox.showerror("Thiếu folder", "Hãy chọn folder nguồn hợp lệ.")
+            return
+        if not output_dir:
+            messagebox.showerror("Thiếu output", "Hãy chọn folder output.")
+            return
+        if not self.get_split_classes():
+            messagebox.showerror("Thiếu class", "Hãy nhập file class `.txt` hoặc cấu hình master classes trước.")
+            return
+        try:
+            self.parse_split_ratios()
+        except ValueError as e:
+            messagebox.showerror("Sai tỉ lệ", str(e))
+            return
+        self.start_activity("Đang chia dataset thành train / val / test...")
+        threading.Thread(target=self.execute_split_dataset).start()
+
+    def execute_split_dataset(self):
+        source_dir = self.split_source_var.get().strip()
+        output_dir = self.split_output_var.get().strip()
+        train_ratio, val_ratio, _ = self.parse_split_ratios()
+        pairs, missing_labels = self.collect_flat_pairs(source_dir)
+        random.shuffle(pairs)
+
+        if self.split_rebuild_var.get() and os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        for split in ["train", "valid", "test"]:
+            os.makedirs(os.path.join(output_dir, split, "images"), exist_ok=True)
+            os.makedirs(os.path.join(output_dir, split, "labels"), exist_ok=True)
+
+        total = len(pairs)
+        train_end = int(total * train_ratio)
+        val_end = train_end + int(total * val_ratio)
+        splits = {
+            "train": pairs[:train_end],
+            "valid": pairs[train_end:val_end],
+            "test": pairs[val_end:],
+        }
+
+        for split_name, items in splits.items():
+            for image_path, label_path in items:
+                shutil.copy2(image_path, os.path.join(output_dir, split_name, "images", os.path.basename(image_path)))
+                shutil.copy2(label_path, os.path.join(output_dir, split_name, "labels", os.path.basename(label_path)))
+
+        self.write_split_yaml(output_dir)
+        self.split_log.delete("1.0", tk.END)
+        self.append_split_log(f"Đã chia xong {total} cặp ảnh-label")
+        self.append_split_log(f"Train: {len(splits['train'])}")
+        self.append_split_log(f"Valid: {len(splits['valid'])}")
+        self.append_split_log(f"Test: {len(splits['test'])}")
+        self.append_split_log(f"Ảnh bỏ qua vì thiếu label: {len(missing_labels)}")
+        self.append_split_log(f"Output: {output_dir}")
+        self.split_status_var.set(f"Đã chia xong {total} cặp ảnh-label")
+        self.root.after(0, lambda: self.finish_activity(f"Đã chia xong {total} cặp ảnh-label"))
+        messagebox.showinfo("Hoàn thành", f"Đã chia xong dataset vào:\n{output_dir}")
 
     def upload_master_classes(self):
         file_path = filedialog.askopenfilename(title="Chọn file chứa class (.txt)", filetypes=[("Text Files", "*.txt")])
@@ -1409,3 +1651,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RemapApp(root)
     root.mainloop()
+

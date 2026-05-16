@@ -6,6 +6,7 @@
 2. Đổi tên đồng bộ ảnh và label.
 3. Dọn label rỗng, ảnh thiếu label và label thiếu ảnh.
 4. Gộp nhiều dataset vào `Master_Dataset`.
+5. Chia folder ảnh-label phẳng thành `train / val / test` và tạo `data.yaml`.
 
 Người dùng chỉ cần chạy:
 
@@ -111,12 +112,13 @@ D:\Learn\classes.txt
 python app_remap.py
 ```
 
-Ứng dụng có 4 tab:
+Ứng dụng có 5 tab:
 
 1. `Chuẩn hoá ID`
 2. `Đổi tên dataset`
 3. `Dọn dữ liệu`
 4. `Gộp dataset`
+5. `Chia dataset`
 
 ---
 
@@ -325,6 +327,79 @@ Tab này chỉ copy sang output, không sửa dữ liệu nguồn.
 
 ---
 
+## Tab 5: Chia dataset
+
+### Dùng khi nào
+
+Dùng khi bạn có một folder nguồn đang chứa ảnh và label lẫn chung, ví dụ:
+
+```text
+csdl/
+  image_001.jpg
+  image_001.txt
+  image_002.jpg
+  image_002.txt
+```
+
+và muốn chuyển nó sang cấu trúc YOLO để train.
+
+### Cách thao tác
+
+1. Chọn `Folder nguồn` đang chứa ảnh và `.txt` lẫn chung.
+2. Chọn `Folder output`.
+3. Nếu đã có file class `.txt`, bấm `Nhập file class` để app dùng danh sách đó khi tạo `data.yaml`.
+4. Nhập tỉ lệ chia, mặc định:
+
+```text
+Train = 0.8
+Val   = 0.1
+Test  = 0.1
+```
+
+5. Bấm `Quét trước` để xem số cặp hợp lệ, số ảnh thiếu label và nguồn class đang dùng.
+6. Bấm `Chia dataset`.
+
+### Kết quả
+
+App tạo:
+
+```text
+dataset_yolo/
+  train/
+    images/
+    labels/
+  valid/
+    images/
+    labels/
+  test/
+    images/
+    labels/
+  data.yaml
+```
+
+### Logic xử lý
+
+1. Chỉ lấy ảnh có file `.txt` cùng basename.
+2. Ảnh thiếu label sẽ được bỏ qua và ghi trong log.
+3. Các cặp hợp lệ được trộn ngẫu nhiên trước khi chia.
+4. Output chỉ là bản copy, không sửa dữ liệu gốc.
+5. `data.yaml` được tạo tự động theo cấu trúc:
+
+```yaml
+train: train/images
+val: valid/images
+test: test/images
+```
+
+### Lưu ý
+
+- Tổng tỉ lệ `Train + Val + Test` phải bằng `1.0`.
+- Nếu đã `Nhập file class`, `data.yaml` output sẽ dùng đúng danh sách class từ file `.txt` đó.
+- Nếu không nhập file class riêng, `data.yaml` output sẽ dùng danh sách `master classes` hiện tại của app.
+- Nếu bạn cần remap class trước khi train, hãy chạy tab `Chuẩn hoá ID` trước hoặc kiểm tra kỹ file label nguồn.
+
+---
+
 ## 7. Định dạng label YOLO
 
 Nếu train detection bbox, mỗi dòng label cần có đúng 5 giá trị:
@@ -346,6 +421,7 @@ Nếu một dòng có nhiều hơn 5 giá trị, đó thường là polygon segm
 - [ ] Không còn ảnh thiếu label hoặc label thiếu ảnh.
 - [ ] Ảnh và label cùng basename.
 - [ ] `Master_Dataset` có đủ `train`, `valid`, `test`.
+- [ ] Dataset sau khi chia có đủ `train/images`, `valid/images`, `test/images` và thư mục `labels` tương ứng.
 - [ ] `data.yaml` đúng thứ tự class.
 - [ ] Đã backup trước các thao tác sửa hoặc xóa dữ liệu gốc.
 
