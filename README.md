@@ -18,7 +18,7 @@ python app_remap.py
 ## 1. Cấu trúc project
 
 ```text
-Convert_DataRau/
+YOLO-Dataset-Studio/
   app_remap.py
   README.md
 ```
@@ -366,3 +366,4 @@ Nếu một dòng có nhiều hơn 5 giá trị, đó thường là polygon segm
 2. Thêm file cấu hình ngoài thay vì hard-code path.
 3. Ghi log ra file.
 4. Tách logic nghiệp vụ thành module riêng nếu app tiếp tục lớn hơn.
+
